@@ -1,3 +1,4 @@
+process.env.DEBUG_URL = "https://localhost:3000";
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
