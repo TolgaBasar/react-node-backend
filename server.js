@@ -11,7 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey123!";
 
-// ✅ CORS AYARI BURADA
+// ✅ CORS doğru ayarlandı
 app.use(
   cors({
     origin: "https://react-node-fullstack-fjk5.vercel.app",
@@ -21,11 +21,12 @@ app.use(
   })
 );
 
+// ✅ Preflight OPTIONS için
+app.options("*", cors());
+
 app.use(express.json());
 
-// -------------------------- Geri kalan kod aynı --------------------------
-app.options("*", cors()); // Preflight için
-
+// ✅ LOGIN
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
   try {
@@ -53,8 +54,16 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
+// ✅ REGISTER
 app.post("/api/register", async (req, res) => {
-  const { manager_name, manager_surname, manager_username, manager_password, manager_mail } = req.body;
+  const {
+    manager_name,
+    manager_surname,
+    manager_username,
+    manager_password,
+    manager_mail,
+  } = req.body;
+
   try {
     const check = await pool.query(
       `SELECT * FROM MANAGERS WHERE MANAGER_NAME = $1 AND MANAGER_SURNAME = $2 AND MANAGER_USERNAME = $3 AND MANAGER_MAIL = $4`,
@@ -68,7 +77,13 @@ app.post("/api/register", async (req, res) => {
     await pool.query(
       `INSERT INTO MANAGERS (MANAGER_NAME, MANAGER_SURNAME, MANAGER_USERNAME, MANAGER_PASSWORD, MANAGER_MAIL)
        VALUES ($1, $2, $3, $4, $5)`,
-      [manager_name, manager_surname, manager_username, manager_password, manager_mail]
+      [
+        manager_name,
+        manager_surname,
+        manager_username,
+        manager_password,
+        manager_mail,
+      ]
     );
 
     await sendMail({
@@ -85,6 +100,54 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
+// ✅ Korumalı kullanıcı listesi (isteğe bağlı kullanılıyor)
+app.get("/api/users", verifyToken, async (req, res) => {
+  try {
+    const check = await pool.query(
+      "SELECT MANAGER_ID FROM MANAGERS WHERE MANAGER_ID = $1",
+      [req.user.id]
+    );
+
+    if (check.rows.length === 0) {
+      return res.status(401).json({ message: "Kullanıcı silinmiş veya yetkisiz." });
+    }
+
+    const result = await pool.query("SELECT * FROM MANAGERS");
+    res.json(result.rows);
+  } catch (err) {
+    console.error("API /users hatası:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ GÜNCELLEME
+app.put("/api/users/:id", verifyToken, async (req, res) => {
+  const { manager_name, manager_surname, manager_username, manager_mail } = req.body;
+  try {
+    await pool.query(
+      `UPDATE MANAGERS 
+       SET MANAGER_NAME = $1, MANAGER_SURNAME = $2, MANAGER_USERNAME = $3, MANAGER_MAIL = $4 
+       WHERE MANAGER_ID = $5`,
+      [manager_name, manager_surname, manager_username, manager_mail, req.params.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Güncelleme hatası:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ✅ SİLME
+app.delete("/api/users/:id", verifyToken, async (req, res) => {
+  try {
+    await pool.query("DELETE FROM MANAGERS WHERE MANAGER_ID = $1", [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ SERVER BAŞLAT
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
