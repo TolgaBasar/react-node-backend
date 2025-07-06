@@ -1,17 +1,22 @@
-require("dotenv").config(); // <-- .env desteği eklendi (ilk satır)
+require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const verifyToken = require("./middlewares/auth");
 const sendMail = require("./utils/sendMail");
-const pool = require("./db"); // PostgreSQL bağlantısı
+const pool = require("./db");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey123!";
 
-app.use(cors());
+// 🔒 CORS ayarı (sadece frontend adresine izin ver)
+app.use(cors({
+  origin: 'https://react-node-fullstack-fjk5.vercel.app',
+  credentials: true
+}));
+
 app.use(express.json());
 
 // LOGIN
@@ -128,5 +133,5 @@ app.delete("/api/users/:id", verifyToken, async (req, res) => {
 
 // START SERVER
 app.listen(PORT, () => {
-console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
