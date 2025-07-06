@@ -1,63 +1,42 @@
+require("dotenv").config(); // <-- .env desteği eklendi (ilk satır)
+
 const express = require("express");
 const cors = require("cors");
-const sql = require("mssql");
 const jwt = require("jsonwebtoken");
-const nodemailer = require("nodemailer");
 const verifyToken = require("./middlewares/auth");
 const sendMail = require("./utils/sendMail");
-const app = express();
-const PORT = 5000;
-const JWT_SECRET = "supersecretkey123!";
+const pool = require("./db"); // PostgreSQL bağlantısı
 
-const dbConfig = {
-  user: "fullstackuser",
-  password: "1234",
-  server: "TOLGA",
-  database: "FullstackDB",
-  options: {
-    encrypt: false,
-    trustServerCertificate: true,
-  },
-};
+const app = express();
+const PORT = process.env.PORT || 5000;
+const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey123!";
 
 app.use(cors());
 app.use(express.json());
 
-// ✅ Mail gönderme fonksiyonu
- 
-
- 
- 
-
+// LOGIN
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    const pool = await sql.connect(dbConfig);
+    const result = await pool.query(
+      `SELECT * FROM MANAGERS WHERE MANAGER_USERNAME = $1 AND MANAGER_PASSWORD = $2`,
+      [username, password]
+    );
 
-    const result = await pool.request()
-      .input("username", sql.VarChar, username)
-      .input("password", sql.VarChar, password)
-      .query(`
-        SELECT * FROM MANAGERS 
-        WHERE MANAGER_USERNAME = @username 
-          AND MANAGER_PASSWORD = @password
-      `);
-
-    if (result.recordset.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(401).json({ message: "Kullanıcı bulunamadı veya şifre yanlış." });
     }
 
-    // ✅ Gerçek JWT token üret
     const token = jwt.sign(
-      { id: result.recordset[0].MANAGER_ID },
+      { id: result.rows[0].manager_id },
       JWT_SECRET,
       { expiresIn: "1h" }
     );
 
     res.json({
       success: true,
-      user: result.recordset[0],
+      user: result.rows[0],
       token
     });
   } catch (err) {
@@ -66,103 +45,70 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-
-
-
-// ✅ REGISTER
+// REGISTER
 app.post("/api/register", async (req, res) => {
   const { manager_name, manager_surname, manager_username, manager_password, manager_mail } = req.body;
 
   try {
-    const pool = await sql.connect(dbConfig);
+    const check = await pool.query(
+      `SELECT * FROM MANAGERS WHERE MANAGER_NAME = $1 AND MANAGER_SURNAME = $2 AND MANAGER_USERNAME = $3 AND MANAGER_MAIL = $4`,
+      [manager_name, manager_surname, manager_username, manager_mail]
+    );
 
-    // ✅ Aynı kullanıcı kontrolü
-    const check = await pool.request()
-      .input("manager_name", sql.VarChar, manager_name)
-      .input("manager_surname", sql.VarChar, manager_surname)
-      .input("manager_username", sql.VarChar, manager_username)
-      .input("manager_mail", sql.VarChar, manager_mail)
-      .query(`
-        SELECT * FROM MANAGERS
-        WHERE 
-          MANAGER_NAME = @manager_name AND 
-          MANAGER_SURNAME = @manager_surname AND 
-          MANAGER_USERNAME = @manager_username AND 
-          MANAGER_MAIL = @manager_mail
-      `);
-
-    if (check.recordset.length > 0) {
+    if (check.rows.length > 0) {
       return res.status(400).json({ success: false, message: "duplicate" });
     }
 
-    // ✅ Yeni kayıt
-    await pool.request()
-      .input("manager_name", sql.VarChar, manager_name)
-      .input("manager_surname", sql.VarChar, manager_surname)
-      .input("manager_username", sql.VarChar, manager_username)
-      .input("manager_password", sql.VarChar, manager_password)
-      .input("manager_mail", sql.VarChar, manager_mail)
-      .query(`
-        INSERT INTO MANAGERS (MANAGER_NAME, MANAGER_SURNAME, MANAGER_USERNAME, MANAGER_PASSWORD, MANAGER_MAIL)
-        VALUES (@manager_name, @manager_surname, @manager_username, @manager_password, @manager_mail)
-      `);
+    await pool.query(
+      `INSERT INTO MANAGERS (MANAGER_NAME, MANAGER_SURNAME, MANAGER_USERNAME, MANAGER_PASSWORD, MANAGER_MAIL)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [manager_name, manager_surname, manager_username, manager_password, manager_mail]
+    );
 
-    // ✅ Mail gönderimi
     await sendMail({
       name: manager_name,
       surname: manager_surname,
       username: manager_username,
-      email: manager_mail,
+      email: manager_mail
     });
 
     res.json({ success: true });
-
   } catch (err) {
     console.error("Kayıt hatası:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-
-// ✅ TÜM KULLANICILARI GETİR
+// GET USERS
 app.get("/api/users", verifyToken, async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    const check = await pool.request()
-      .input("id", sql.Int, req.user.id)
-      .query("SELECT MANAGER_ID FROM MANAGERS WHERE MANAGER_ID = @id");
+    const check = await pool.query(
+      "SELECT MANAGER_ID FROM MANAGERS WHERE MANAGER_ID = $1",
+      [req.user.id]
+    );
 
-    if (check.recordset.length === 0) {
+    if (check.rows.length === 0) {
       return res.status(401).json({ message: "Kullanıcı silinmiş veya yetkisiz." });
     }
 
-    const result = await pool.request().query("SELECT * FROM MANAGERS");
-    res.json(result.recordset);
+    const result = await pool.query("SELECT * FROM MANAGERS");
+    res.json(result.rows);
   } catch (err) {
     console.error("API /users hatası:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ✅ GÜNCELLE
+// UPDATE USER
 app.put("/api/users/:id", verifyToken, async (req, res) => {
   const { manager_name, manager_surname, manager_username, manager_mail } = req.body;
   try {
-    const pool = await sql.connect(dbConfig);
-    await pool.request()
-      .input("id", sql.Int, req.params.id)
-      .input("name", sql.VarChar, manager_name)
-      .input("surname", sql.VarChar, manager_surname)
-      .input("username", sql.VarChar, manager_username)
-      .input("mail", sql.VarChar, manager_mail)
-      .query(`
-        UPDATE MANAGERS SET 
-          MANAGER_NAME = @name,
-          MANAGER_SURNAME = @surname,
-          MANAGER_USERNAME = @username,
-          MANAGER_MAIL = @mail
-        WHERE MANAGER_ID = @id
-      `);
+    await pool.query(
+      `UPDATE MANAGERS 
+       SET MANAGER_NAME = $1, MANAGER_SURNAME = $2, MANAGER_USERNAME = $3, MANAGER_MAIL = $4 
+       WHERE MANAGER_ID = $5`,
+      [manager_name, manager_surname, manager_username, manager_mail, req.params.id]
+    );
     res.json({ success: true });
   } catch (err) {
     console.error("Güncelleme hatası:", err);
@@ -170,20 +116,17 @@ app.put("/api/users/:id", verifyToken, async (req, res) => {
   }
 });
 
-// ✅ SİL
+// DELETE USER
 app.delete("/api/users/:id", verifyToken, async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
-    await pool.request()
-      .input("id", sql.Int, req.params.id)
-      .query("DELETE FROM MANAGERS WHERE MANAGER_ID = @id");
+    await pool.query("DELETE FROM MANAGERS WHERE MANAGER_ID = $1", [req.params.id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ✅ SERVER BAŞLAT
+// START SERVER
 app.listen(PORT, () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
+console.log(`🚀 Server running on port ${PORT}`);
 });
