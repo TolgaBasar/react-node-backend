@@ -1,4 +1,3 @@
- 
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
@@ -8,26 +7,27 @@ const pool = require("./db");
 
 const app = express();
 
-// Sabit değerler (env olmadan)
+// Sabit değerler (dotenv yerine sabit tanım)
 const PORT = 5000;
 const JWT_SECRET = "supersecretkey123!";
-const FRONTEND_URL = "https://react-node-fullstack.vercel.app"; // Vercel frontend URL'in
+const FRONTEND_URL = "https://react-node-fullstack.vercel.app";
 
-// CORS middleware (özelleştirilmiş)
- 
+// ✅ CORS ayarı
+app.use(cors({
+  origin: FRONTEND_URL,
+  credentials: true,
+}));
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      callback(null, "https://react-node-fullstack.vercel.app"); // Sabit URL olarak yaz
-    },
-    credentials: true,
-  })
-);
-
-
+// ✅ JSON parse
 app.use(express.json());
+
+// ✅ Preflight desteği
 app.options("*", cors());
+
+// ✅ Sağlık kontrolü
+app.get("/", (req, res) => {
+  res.send("API is running.");
+});
 
 // ✅ LOGIN
 app.post("/api/login", async (req, res) => {
@@ -42,7 +42,11 @@ app.post("/api/login", async (req, res) => {
       return res.status(401).json({ message: "Kullanıcı bulunamadı veya şifre yanlış." });
     }
 
-    const token = jwt.sign({ id: result.rows[0].manager_id }, JWT_SECRET, { expiresIn: "1h" });
+    const token = jwt.sign(
+      { id: result.rows[0].manager_id },
+      JWT_SECRET,
+      { expiresIn: "1h" }
+    );
 
     res.json({
       success: true,
@@ -88,11 +92,7 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
-// ✅ Sağlık kontrolü
-app.get("/", (req, res) => {
-  res.send("API is running.");
-});
-
+// ✅ SUNUCUYU BAŞLAT
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
