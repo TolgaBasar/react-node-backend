@@ -14,21 +14,17 @@ const JWT_SECRET = "supersecretkey123!";
 const FRONTEND_URL = "https://react-node-fullstack.vercel.app"; // Vercel frontend URL'in
 
 // CORS middleware (özelleştirilmiş)
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", FRONTEND_URL);
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
-  next();
-});
+ 
 
 app.use(
   cors({
-    origin: FRONTEND_URL,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    origin: function (origin, callback) {
+      callback(null, "https://react-node-fullstack.vercel.app"); // Sabit URL olarak yaz
+    },
     credentials: true,
   })
 );
+
 
 app.use(express.json());
 app.options("*", cors());
