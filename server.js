@@ -10,9 +10,9 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey123!";
 
-// 🔴 CORS fix middleware – En üste
+// ⚫️ CORS fix middleware – En üste
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "https://react-node-fullstack-fjk5.vercel.app");
+  res.header("Access-Control-Allow-Origin", process.env.FRONTEND_URL);
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
   next();
@@ -21,7 +21,7 @@ app.use((req, res, next) => {
 // ✅ Normal CORS middleware
 app.use(
   cors({
-    origin: "https://react-node-fullstack-fjk5.vercel.app",
+    origin: process.env.FRONTEND_URL,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
