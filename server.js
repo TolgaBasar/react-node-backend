@@ -13,7 +13,8 @@ const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey123!";
 
 // 🔒 CORS ayarı (sadece frontend adresine izin ver)
 app.use(cors({
-  origin: 'https://react-node-fullstack-fjk5.vercel.app',
+  origin: process.env.FRONTEND_URL,
+  methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
 
