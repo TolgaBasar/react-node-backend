@@ -1,4 +1,3 @@
-require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
@@ -7,21 +6,23 @@ const sendMail = require("./utils/sendMail");
 const pool = require("./db");
 
 const app = express();
-const PORT = process.env.PORT || 5000;
-const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey123!";
 
-// ⚫️ CORS fix middleware – En üste
+// Sabit değerler (env olmadan)
+const PORT = 5000;
+const JWT_SECRET = "supersecretkey123!";
+const FRONTEND_URL = "https://react-node-fullstack.vercel.app"; // Vercel frontend URL'in
+
+// CORS middleware (özelleştirilmiş)
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", process.env.FRONTEND_URL);
+  res.header("Access-Control-Allow-Origin", FRONTEND_URL);
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
   next();
 });
 
-// ✅ Normal CORS middleware
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL,
+    origin: FRONTEND_URL,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -29,9 +30,9 @@ app.use(
 );
 
 app.use(express.json());
-app.options("*", cors()); // Preflight için
+app.options("*", cors());
 
-// 🟢 LOGIN
+// ✅ LOGIN
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
   try {
@@ -44,9 +45,7 @@ app.post("/api/login", async (req, res) => {
       return res.status(401).json({ message: "Kullanıcı bulunamadı veya şifre yanlış." });
     }
 
-    const token = jwt.sign({ id: result.rows[0].manager_id }, JWT_SECRET, {
-      expiresIn: "1h",
-    });
+    const token = jwt.sign({ id: result.rows[0].manager_id }, JWT_SECRET, { expiresIn: "1h" });
 
     res.json({
       success: true,
@@ -59,7 +58,7 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// 🟢 REGISTER
+// ✅ REGISTER
 app.post("/api/register", async (req, res) => {
   const { manager_name, manager_surname, manager_username, manager_password, manager_mail } = req.body;
   try {
@@ -92,12 +91,11 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
-// ✅ Sağlık kontrolü için kök route
+// ✅ Sağlık kontrolü
 app.get("/", (req, res) => {
   res.send("API is running.");
 });
 
-// ✅ Sunucuyu başlat
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
