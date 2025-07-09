@@ -7,21 +7,30 @@ const pool = require("./db");
 
 const app = express();
 
-// Sabit değerler (dotenv yerine sabit tanım)
+// Sabit değerler
 const PORT = 5000;
 const JWT_SECRET = "supersecretkey123!";
-const FRONTEND_URL = "https://react-node-fullstack.vercel.app";
+const FRONTEND_URLS = [
+  "http://localhost:3000",
+  "https://react-node-fullstack.vercel.app"
+];
 
 // ✅ CORS ayarı
 app.use(cors({
-  origin: FRONTEND_URL,
+  origin: function (origin, callback) {
+    if (!origin || FRONTEND_URLS.some(url => origin.includes(url))) {
+      callback(null, true);
+    } else {
+      callback(new Error("CORS Hatası"));
+    }
+  },
   credentials: true,
 }));
 
 // ✅ JSON parse
 app.use(express.json());
 
-// ✅ Preflight desteği
+// ✅ Preflight (OPTIONS) desteği
 app.options("*", cors());
 
 // ✅ Sağlık kontrolü
@@ -29,7 +38,7 @@ app.get("/", (req, res) => {
   res.send("API is running.");
 });
 
-// ✅ LOGIN
+// ✅ LOGIN endpoint
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
   try {
@@ -59,9 +68,16 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// ✅ REGISTER
+// ✅ REGISTER endpoint
 app.post("/api/register", async (req, res) => {
-  const { manager_name, manager_surname, manager_username, manager_password, manager_mail } = req.body;
+  const {
+    manager_name,
+    manager_surname,
+    manager_username,
+    manager_password,
+    manager_mail,
+  } = req.body;
+
   try {
     const check = await pool.query(
       `SELECT * FROM MANAGERS WHERE MANAGER_NAME = $1 AND MANAGER_SURNAME = $2 AND MANAGER_USERNAME = $3 AND MANAGER_MAIL = $4`,
